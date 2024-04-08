@@ -9,9 +9,8 @@ def run_menu():
     process_num = int(file.readline().strip())
     for i in range(0, process_num):
         process = Process(file)
-        mem.input_queue.append(process)
+        mem.add_process(process)
 
-    run_mem_mod(mem)
 
 
 def open_file(file_name):
@@ -21,12 +20,6 @@ def open_file(file_name):
         exit(1)
 
     return file
-
-
-def run_mem_mod(mm):
-
-
-
 
 if __name__ == '__main__':
     run_menu()

@@ -51,9 +51,41 @@ class Process:
             self.total_mem_size += int(j)
 
 
+class MemMap:
+    def __init__(self, size):
+        self.total_size = 0
+        self.max_size = size
+        self.next = 0
+        self.p_start = []
+        self.p_end = []
+        self.p_id = []
+
+
+    def add(self, process):
+        self.p_id.append(process.id)
+        self.p_start.append(self.next)
+        self.next = self.next + process.total_mem_size
+        self.p_end.append(self.next - 1)
+
+
+    def print(self):
+        if len(self.p_id) == 0 :
+            print((' ' * 7) + 'Memory Map: 0-' + str(self.max_size) + ': Hole')
+        else:
+            if self.p_start[0] != 0:
+                print((' ' * 18) + 'Memory Map: 0-' + str(self.p_start[0]-1) + ': Hole')
+            else:
+                print((' ' * 18) + 'Memory Map: 0-' + str(self.p_end[0]) + ': Process ' + self.p_id[0])
+
+            for i in range(1, len(self.p_id)):
+                if self.p_start
+
+        if self.next != self.max_size:
+            print((' ' * 18) + str(self.next) + '-' + str(self.max_size-1) + ': Hole')
+
 class Manager:
     def __init__(self):
-        self.v_clock = 0
+        self.v_clock = -1
         self.allocated_mem = 0
         self.mem_size = int(input("Memory size: ").strip())
         self.policy = Policy(int(input("Memory management policy (1 - VSP, 2 - PAG, 3 - SEG): ").strip()))
@@ -63,8 +95,32 @@ class Manager:
             self.p_f_size = int(input("Page/Frame size: ").strip())
 
         self.input_queue = []
-        self.mem_map = ''
+        self.in_queue_val = []
+        self.mem_map = MemMap(self.mem_size)
+        self.spacing = ' ' * 7
 
-    
+    def print_queue(self):
+        print('\t Input Queue:' + str(self.in_queue_val))
 
+
+    def add_process(self, process):
+        if process.arr_time != self.v_clock:
+            if len(self.input_queue) > 0:
+                self.move_to_mem()
+            self.v_clock = process.arr_time
+            print('t = ' + str(self.v_clock) + ': Process ' + str(process.arr_time) + ' arrives')
+        else:
+            print(self.spacing + 'Process ' + str(process.arr_time) + ' arrives')
+
+        self.input_queue.append(process)
+        self.in_queue_val.append(process.id)
+        self.print_queue()
+
+    def move_to_mem(self):
+        for p in self.input_queue:
+            print(self.spacing + 'MM moves Process ' + p.id + ' to memory')
+            self.input_queue.pop(0)
+            self.input_queue.pop(0)
+            self.print_queue()
+            self.mem_map.print()
 
