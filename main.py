@@ -11,6 +11,8 @@ def run_menu():
         process = Process(file)
         mem.add_process(process)
 
+    while len(mem.input_queue) > 0:
+        mem.finish()
 
 
 def open_file(file_name):
@@ -20,6 +22,7 @@ def open_file(file_name):
         exit(1)
 
     return file
+
 
 if __name__ == '__main__':
     run_menu()
