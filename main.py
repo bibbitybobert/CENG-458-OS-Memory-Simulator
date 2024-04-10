@@ -1,4 +1,3 @@
-import mem_policies as mp
 from mem_manager import Manager, Process
 
 
@@ -11,8 +10,9 @@ def run_menu():
         process = Process(file)
         mem.add_process(process)
 
-    while len(mem.input_queue) > 0:
-        mem.finish()
+    mem.finish()
+
+    print('\nAverage Turnaround Time: ' + str(sum(mem.turnarounds) / process_num))
 
 
 def open_file(file_name):

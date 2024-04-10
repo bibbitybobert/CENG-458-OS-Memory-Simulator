@@ -139,6 +139,7 @@ class Manager:
 
         self.input_queue = []
         self.in_queue_val = []
+        self.turnarounds = []
         self.mem = BetterMem(self.mem_size/10)
         self.spacing = ' ' * 8
 
@@ -158,9 +159,13 @@ class Manager:
             if len(self.input_queue) > 0:
                 self.move_to_mem()
 
-            start = '\nt = ' + str(self.v_clock) + ': '
+            first = True
+            start = (' ' * 8)
             while process.arr_time > self.mem.next_end[0][0]:
                 self.v_clock = self.mem.next_end[0][0]
+                if first:
+                    start = '\nt = ' + str(self.v_clock) + ': '
+                    first = False
                 print(start + 'Process ' + str(self.mem.next_end[0][1]) + ' completes')
                 start = (' ' * 8)
                 self.mem.process_end()
@@ -176,26 +181,51 @@ class Manager:
         self.print_queue()
 
     def finish(self):
-        if len(self.input_queue) > 0:
-            self.move_to_mem()
+        while self.mem.free != self.mem.size:
+            start = '\nt = ' + str(self.v_clock) + ': '
+            while len(self.mem.next_end) > 0 and self.mem.next_end[0][0] == self.v_clock:
+                self.v_clock = self.mem.next_end[0][0]
+                print(start + 'Process ' + str(self.mem.next_end[0][1]) + ' completes')
+                start = (' ' * 8)
+                self.mem.process_end()
+                self.mem.print_mem()
+            else:
+                for i in self.input_queue:
+                    if i.total_mem_size <= self.mem.max_hole_size():
+                        self.move_to_mem()
 
-        start = '\nt = ' + str(self.v_clock) + ': '
-        while len(self.mem.next_end) > 0:
-            self.v_clock = self.mem.next_end[0][0]
-            print(start + 'Process ' + str(self.mem.next_end[0][1]) + ' completes')
-            start = (' ' * 8)
-            self.mem.process_end()
-            self.mem.print_mem()
+            if not self.mem.next_end[0][1] == -1:
+                self.v_clock = self.mem.next_end[0][0]
+            else:
+                break
 
     def move_to_mem(self):
         max_hole_size = self.mem.max_hole_size()
-        while len(self.input_queue) > 0 and self.input_queue[0].total_mem_size <= max_hole_size:
-            print(self.spacing + 'MM moves Process ' + str(self.in_queue_val[0]) + ' to memory')
-            self.mem.add_first(self.input_queue[0], self.v_clock)
-            self.input_queue.pop(0)
-            self.in_queue_val.pop(0)
-            self.print_queue()
-            self.mem.print_mem()
+        # while len(self.input_queue) > 0 and self.input_queue[0].total_mem_size <= max_hole_size:
+        #     print(self.spacing + 'MM moves Process ' + str(self.in_queue_val[0]) + ' to memory')
+        #     self.mem.add_first(self.input_queue[0], self.v_clock)
+        #     self.input_queue.pop(0)
+        #     self.in_queue_val.pop(0)
+        #     self.print_queue()
+        #     self.mem.print_mem()
+        change = False
+        while len(self.input_queue) > 0:
+            change = False
+            i = 0
+            while len(self.input_queue) > i >= 0:
+                if self.input_queue[i].total_mem_size <= max_hole_size:
+                    print(self.spacing + 'MM moves Process ' + str(self.input_queue[i].id) + ' to memory')
+                    self.turnarounds.append(self.mem.add_first(self.input_queue[i], self.v_clock))
+                    self.in_queue_val.remove(self.input_queue[i].id)
+                    self.input_queue.remove(self.input_queue[i])
+                    self.print_queue()
+                    self.mem.print_mem()
+                    i = 0
+                    change = True
+                else:
+                    i += 1
+            if not change:
+                break
 
 
 class BetterMem:
@@ -217,6 +247,7 @@ class BetterMem:
             if i[1] > mem_blk:
                 first_hole = i[0]
                 self.holes.append([i[0] + mem_blk, i[1]-mem_blk])
+                self.holes.sort()
                 self.holes.remove(i)
                 break
 
@@ -228,6 +259,8 @@ class BetterMem:
 
             self.next_end.append([clock + process.lifetime, process.id])
             self.next_end.sort()
+
+        return (clock+process.lifetime) - process.arr_time
 
     def print_mem(self):
         print((' ' * 8) + 'Memory Map:')
@@ -247,16 +280,21 @@ class BetterMem:
         end_id = self.next_end[0][1]
         self.next_end.pop(0)
         new_hole = -1
+        hit = False
         for i in range(len(self.mem)):
             if self.mem[i] == end_id:
+                hit = True
                 if new_hole == -1:
                     new_hole = i
                     self.holes.append([i, 0])
                 self.mem[i] = 0
                 self.holes[-1][1] += 1
                 self.free += 10
+            elif hit:
+                break
 
         self.holes.sort()
+        self.consolidate_holes()
 
     def max_hole_size(self):
         max_size = 0
@@ -265,3 +303,17 @@ class BetterMem:
                 max_size = i[1]
 
         return max_size * 10
+
+    def consolidate_holes(self):
+        changed = True
+        while changed:
+            changed = False
+            for i in range(len(self.holes) - 1):
+                if i == len(self.holes) - 1:
+                    break
+                if self.holes[i][0] + self.holes[i][1] == self.holes[i+1][0]:
+                    changed = True
+                    self.holes.append([self.holes[i][0], self.holes[i][1] + self.holes[i+1][1]])
+                    self.holes.pop(i+1)
+                    self.holes.pop(i)
+                    self.holes.sort()
