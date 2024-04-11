@@ -120,13 +120,78 @@ class Manager:
                     self.mem.print_mem()
             else:
                 for i in self.input_queue:
-                    if i.total_mem_size <= self.mem.max_hole_size():
-                        self.move_to_mem()
+                    if self.policy.name == "VSP":
+                        if i.total_mem_size <= self.mem.max_hole_size():
+                            self.move_to_mem()
+                    elif self.policy.name == "SEG":
+                        if self.room_for_seg(i):
+                            self.move_to_mem()
+                    elif self.policy.name == 'PAG':  # paging
+                        if i.total_mem_size <= self.mem.free:
+                            self.move_to_mem()
 
             if not self.mem.next_end[0][1] == -1:
                 self.v_clock = self.mem.next_end[0][0]
             else:
                 break
+
+    def hole_cpy(self):
+        cpy = []
+        for i in self.mem.holes:
+            cpy.append(i)
+
+        return cpy
+
+    def room_for_seg(self, process):
+        copy_holes = self.hole_cpy()
+        for i in process.mem_pieces:
+            mem_blk = int(i/10)
+            if self.alg.name == 'First Fit':
+                found = False
+                for j in copy_holes:
+                    if j[1] == mem_blk:
+                        found = True
+                        copy_holes.remove(j)
+                        break
+                    elif j[1] > mem_blk:
+                        found = True
+                        copy_holes.append([j[0] + mem_blk, j[1] - mem_blk])
+                        copy_holes.sort()
+                        copy_holes.remove(j)
+                        break
+
+                if not found:
+                    return False
+
+            elif self.alg.name == 'Best Fit':
+                best_hole = [-1, 100001]
+                for j in copy_holes:
+                    if j[1] == mem_blk:
+                        best_hole = j
+                        copy_holes.remove(j)
+                    elif mem_blk < j[1] < best_hole[1]:
+                        best_hole = j
+                        copy_holes.append([j[0] + mem_blk, j[1] - mem_blk])
+                        copy_holes.sort()
+                        copy_holes.remove(j)
+
+                if best_hole[0] == -1:
+                    return False
+
+            elif self.alg.name == 'Worst Fit':
+                worst_hole = [-1, 0]
+                for j in copy_holes:
+                    if j[1] >= mem_blk and j[1] >= worst_hole[1]:
+                        worst_hole = j
+
+                if worst_hole[0] == -1:
+                    return False
+
+                copy_holes.append([worst_hole[0] + mem_blk, worst_hole[1] - mem_blk])
+                copy_holes.sort()
+                copy_holes.remove(worst_hole)
+
+        return True
 
     def move_to_mem(self):
         max_hole_size = self.mem.max_hole_size()
@@ -142,7 +207,8 @@ class Manager:
                         self.turnarounds.append(self.mem.add_vsp(self.input_queue[i], self.v_clock, self.alg.name))
                         mem_move = True
                 elif self.policy.name == "SEG":
-                    if self.input_queue[i].total_mem_size <= self.mem.free:
+                    if self.room_for_seg(self.input_queue[i]):
+                    # if self.input_queue[i].total_mem_size <= self.mem.free:
                         print(self.spacing + 'MM moves Process ' + str(self.input_queue[i].id) + ' to memory')
                         self.turnarounds.append(self.mem.add_seg(self.input_queue[i], self.v_clock, self.alg.name))
                         mem_move = True
@@ -253,7 +319,7 @@ class BetterMem:
         elif alg == 'Worst Fit':
             worst_hole = [-1, 0]
             for i in self.holes:
-                if i[1] >= mem_blk and i[1] > worst_hole[1]:
+                if i[1] >= mem_blk and i[1] >= worst_hole[1]:
                     worst_hole = i
 
             self.holes.append([worst_hole[0] + mem_blk, worst_hole[1] - mem_blk])

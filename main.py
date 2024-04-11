@@ -12,7 +12,16 @@ def run_menu():
 
     mem.finish()
     print('        ')
-    print('Average Turnaround Time: ' + "{:.2f}".format(sum(mem.turnarounds) / process_num))
+    print('Average Turnaround Time: ' + avg_turn_formatting(sum(mem.turnarounds) / process_num))
+
+
+def avg_turn_formatting(time):
+    temp = time * 100
+
+    if temp % 10 != 0:
+        return "{:.2f}".format(time)
+    else:
+        return "{:.1f}".format(time)
 
 
 def open_file(file_name):
