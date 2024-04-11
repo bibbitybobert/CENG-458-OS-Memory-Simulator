@@ -11,8 +11,8 @@ def run_menu():
         mem.add_process(process)
 
     mem.finish()
-
-    print('\nAverage Turnaround Time: ' + str(sum(mem.turnarounds) / process_num))
+    print('        ')
+    print('Average Turnaround Time: ' + "{:.2f}".format(sum(mem.turnarounds) / process_num))
 
 
 def open_file(file_name):

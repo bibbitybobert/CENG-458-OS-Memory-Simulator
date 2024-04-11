@@ -50,6 +50,7 @@ class Process:
             self.mem_pieces.append(int(j))
             self.total_mem_size += int(j)
 
+
 class Manager:
     def __init__(self):
         self.v_clock = -1
@@ -82,15 +83,22 @@ class Manager:
             while process.arr_time > self.mem.next_end[0][0]:
                 self.v_clock = self.mem.next_end[0][0]
                 if first:
-                    start = '\nt = ' + str(self.v_clock) + ': '
+                    start = '        \nt = ' + str(self.v_clock) + ': '
                     first = False
                 print(start + 'Process ' + str(self.mem.next_end[0][1]) + ' completes')
                 start = (' ' * 8)
                 self.mem.process_end()
-                self.mem.print_mem()
+                if self.policy.name == "PAG":
+                    self.mem.print_mem_paging()
+                else:
+                    self.mem.print_mem()
+
+            if len(self.input_queue) > 0:
+                self.move_to_mem()
 
             self.v_clock = process.arr_time
-            print('\nt = ' + str(self.v_clock) + ': Process ' + str(process.id) + ' arrives')
+            print('        ')
+            print('t = ' + str(self.v_clock) + ': Process ' + str(process.id) + ' arrives')
         else:
             print(self.spacing + 'Process ' + str(process.id) + ' arrives')
 
@@ -99,14 +107,17 @@ class Manager:
         self.print_queue()
 
     def finish(self):
-        while self.mem.free != self.mem.size:
-            start = '\nt = ' + str(self.v_clock) + ': '
+        while self.mem.free != self.mem_size:
+            start = '        \nt = ' + str(self.v_clock) + ': '
             while len(self.mem.next_end) > 0 and self.mem.next_end[0][0] == self.v_clock:
                 self.v_clock = self.mem.next_end[0][0]
                 print(start + 'Process ' + str(self.mem.next_end[0][1]) + ' completes')
                 start = (' ' * 8)
                 self.mem.process_end()
-                self.mem.print_mem()
+                if self.policy.name == "PAG":
+                    self.mem.print_mem_paging()
+                else:
+                    self.mem.print_mem()
             else:
                 for i in self.input_queue:
                     if i.total_mem_size <= self.mem.max_hole_size():
@@ -136,13 +147,19 @@ class Manager:
                         self.turnarounds.append(self.mem.add_seg(self.input_queue[i], self.v_clock, self.alg.name))
                         mem_move = True
                 elif self.policy.name == 'PAG': #paging
-                    self.turnarounds.append(self.mem.add_paging(self.input_queue[i], self.v_clock, self.p_f_size))
+                    if self.input_queue[i].total_mem_size <= self.mem.free:
+                        print(self.spacing + 'MM moves Process ' + str(self.input_queue[i].id) + ' to memory')
+                        self.turnarounds.append(self.mem.add_paging(self.input_queue[i], self.v_clock, self.p_f_size))
+                        mem_move = True
 
                 if mem_move:
                     self.in_queue_val.remove(self.input_queue[i].id)
                     self.input_queue.remove(self.input_queue[i])
                     self.print_queue()
-                    self.mem.print_mem()
+                    if self.policy.name == "PAG":
+                        self.mem.print_mem_paging()
+                    else:
+                        self.mem.print_mem()
                     i = 0
                     change = True
                 else:
@@ -187,7 +204,21 @@ class BetterMem:
         self.next_end.sort()
         return (clock + process.lifetime) - process.arr_time
 
+    def add_paging(self, process, clock, pg_size):
+        while process.total_mem_size % pg_size != 0:
+            process.total_mem_size += 10
+        for j in range(int(process.total_mem_size / pg_size)):
+            first_hole = self.find_hole("First Fit", int(pg_size/10))
+            if first_hole != -1:
+                for i in range(first_hole, first_hole + int(pg_size/10)):
+                    if i < len(self.mem):
+                        self.mem[i] = [process.id, j + 1]
+                        self.free -= 10
 
+        self.next_end.append([clock + process.lifetime, process.id])
+        self.next_end.sort()
+
+        return (clock + process.lifetime) - process.arr_time
 
     def find_hole(self, alg, mem_blk):
         hole_idx = -1
@@ -205,7 +236,7 @@ class BetterMem:
                     return first_hole
 
         elif alg == 'Best Fit':
-            best_hole = self.holes[0]
+            best_hole = [-1, 100001]
             for i in self.holes:
                 if i[1] == mem_blk:
                     best_hole = i
@@ -220,9 +251,9 @@ class BetterMem:
             return best_hole[0]
 
         elif alg == 'Worst Fit':
-            worst_hole = self.holes[0]
+            worst_hole = [-1, 0]
             for i in self.holes:
-                if i[1] > mem_blk and i[1] > worst_hole[1]:
+                if i[1] >= mem_blk and i[1] > worst_hole[1]:
                     worst_hole = i
 
             self.holes.append([worst_hole[0] + mem_blk, worst_hole[1] - mem_blk])
@@ -233,17 +264,8 @@ class BetterMem:
             print('unknown alg quitting')
             exit(-1)
 
-    def add_seg_best(self, process, clock):
-        print('seg best')
-
-    def add_seg_worst(self, process, clock):
-        print('seg worst')
-
-    def add_paging(self, process, clock, pg_size):
-        print('paging with pg size: ' + str(pg_size))
-
     def print_mem(self):
-        print((' ' * 8) + 'Memory Map:')
+        print((' ' * 8) + 'Memory Map: ')
         end = 0
         while end != len(self.mem):
             start = end
@@ -259,8 +281,22 @@ class BetterMem:
                 else:
                     print((' ' * 16) + str(start * 10) + '-' + str(((end + 1) * 10) - 1) +
                           ': Process ' + str(self.mem[start][0]))
+            end += 1
 
+    def print_mem_paging(self):
+        print((' ' * 8) + 'Memory Map: ')
+        end = 0
+        while end != len(self.mem):
+            start = end
+            while end + 1 != len(self.mem) and self.mem[end][0] == self.mem[end + 1][0] and self.mem[end][1] == \
+                    self.mem[end + 1][1]:
+                end += 1
 
+            if self.mem[start][0] == 0:
+                print((' ' * 16) + str(start * 10) + '-' + str(((end + 1) * 10) - 1) + ': Free Frame(s)')
+            else:
+                print((' ' * 16) + str(start * 10) + '-' + str(((end + 1) * 10) - 1) +
+                      ': Process ' + str(self.mem[start][0]) + ', Page ' + str(self.mem[start][1]))
             end += 1
 
     def process_end(self):
@@ -275,6 +311,10 @@ class BetterMem:
                 self.mem[i] = [0, -1]
                 self.holes[-1][1] += 1
                 self.free += 10
+            elif new_hole != -1:
+                self.holes.sort()
+                self.consolidate_holes()
+                new_hole = -1
 
         self.holes.sort()
         self.consolidate_holes()
